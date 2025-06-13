@@ -16,7 +16,7 @@
       margin: 0.5rem 0;
     }
     .output {
-      margin-top: 1rem;
+      margin-top: 1.5rem;
       padding: 1rem;
       background: #2c2c3a;
       border-radius: 8px;
@@ -46,13 +46,16 @@
     button:hover {
       background: #4752c4;
     }
+    .preview {
+      margin-top: 0.5rem;
+      color: #aaa;
+    }
   </style>
 </head>
 <body>
   <h1>Discord Timestamp Generator</h1>
 
-  <label>
-    Select Time Mode:
+  <label>Select Time Mode:
     <select id="mode" onchange="updateTimeInput()">
       <option value="local">Local Time (12hr)</option>
       <option value="utc">UTC Time (24hr)</option>
@@ -144,11 +147,44 @@
       const timestamp = Math.floor(dateObj.getTime() / 1000);
       const discordTag = `<t:${timestamp}:${format}>`;
 
+      const renderedPreview = getPreview(format, dateObj);
+
       showResult(`
-        ✅ <strong>Discord Timestamp:</strong><br>
-        <span class="copyable" onclick="copyTag('${discordTag}')">${discordTag}</span><br><br>
-        🧮 <strong>Unix Timestamp:</strong> ${timestamp}
+        ✅ <strong>Discord Tag:</strong><br>
+        <code class="copyable" onclick="copyTag('${discordTag}')">${discordTag}</code><br><br>
+        📆 <strong>Preview:</strong> ${renderedPreview}<br><br>
+        🔢 <strong>Unix Timestamp:</strong> ${timestamp}
       `);
+    }
+
+    function getPreview(format, dateObj) {
+      const optsDate = { year: "numeric", month: "long", day: "numeric" };
+      const optsTime = { hour: "numeric", minute: "2-digit", second: "2-digit" };
+      switch (format) {
+        case "F": return dateObj.toLocaleString();
+        case "f": return dateObj.toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
+        case "R": return getRelativeTime(dateObj);
+        case "d": return dateObj.toLocaleDateString();
+        case "D": return dateObj.toLocaleDateString(undefined, optsDate);
+        case "t": return dateObj.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+        case "T": return dateObj.toLocaleTimeString();
+        default: return "";
+      }
+    }
+
+    function getRelativeTime(dateObj) {
+      const now = new Date();
+      const diffSeconds = Math.floor((dateObj - now) / 1000);
+      const abs = Math.abs(diffSeconds);
+      const suffix = diffSeconds > 0 ? "from now" : "ago";
+
+      if (abs < 60) return `${abs} seconds ${suffix}`;
+      const minutes = Math.floor(abs / 60);
+      if (minutes < 60) return `${minutes} minutes ${suffix}`;
+      const hours = Math.floor(minutes / 60);
+      if (hours < 24) return `${hours} hours ${suffix}`;
+      const days = Math.floor(hours / 24);
+      return `${days} days ${suffix}`;
     }
 
     function showResult(html) {
