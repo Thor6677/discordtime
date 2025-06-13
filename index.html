@@ -44,6 +44,11 @@
     button:hover {
       background: #4752c4;
     }
+    .flex {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
   </style>
 </head>
 <body>
@@ -51,9 +56,9 @@
 
   <label>
     Select Time Mode:
-    <select id="mode">
-      <option value="local">Local Time</option>
-      <option value="utc">UTC Time</option>
+    <select id="mode" onchange="updateTimeInput()">
+      <option value="local">Local Time (AM/PM)</option>
+      <option value="utc">UTC Time (24hr)</option>
     </select>
   </label>
 
@@ -62,10 +67,13 @@
     <input type="date" id="date" />
   </label>
 
-  <label>
-    Time:
-    <input type="time" id="time" step="1" />
-  </label>
+  <div class="flex" id="localTimeContainer">
+    <label>Time (12hr): <input type="text" id="localTime" placeholder="02:30 PM" /></label>
+  </div>
+
+  <div class="flex" id="utcTimeContainer" style="display: none;">
+    <label>Time (24hr): <input type="time" id="utcTime" step="1" /></label>
+  </div>
 
   <label>
     Format:
@@ -85,19 +93,57 @@
   <div class="output" id="result"></div>
 
   <script>
+    function updateTimeInput() {
+      const mode = document.getElementById("mode").value;
+      document.getElementById("localTimeContainer").style.display = mode === "local" ? "block" : "none";
+      document.getElementById("utcTimeContainer").style.display = mode === "utc" ? "block" : "none";
+    }
+
+    function parseLocalTime(input) {
+      const timeRegex = /^(\d{1,2}):(\d{2})(?:\s*)(AM|PM)$/i;
+      const match = input.match(timeRegex);
+      if (!match) return null;
+
+      let [_, hours, minutes, period] = match;
+      hours = parseInt(hours, 10);
+      minutes = parseInt(minutes, 10);
+
+      if (period.toUpperCase() === "PM" && hours !== 12) hours += 12;
+      if (period.toUpperCase() === "AM" && hours === 12) hours = 0;
+
+      return { hours, minutes };
+    }
+
     function generate() {
       const mode = document.getElementById("mode").value;
       const date = document.getElementById("date").value;
-      const time = document.getElementById("time").value;
       const format = document.getElementById("format").value;
+      let dateObj;
 
-      if (!date || !time) {
-        document.getElementById("result").innerText = "Please select a date and time.";
+      if (!date) {
+        document.getElementById("result").innerText = "Please select a date.";
         return;
       }
 
-      const datetimeStr = `${date}T${time}`;
-      const dateObj = new Date(datetimeStr + (mode === "utc" ? "Z" : ""));
+      if (mode === "local") {
+        const timeInput = document.getElementById("localTime").value.trim();
+        const parsed = parseLocalTime(timeInput);
+        if (!parsed) {
+          document.getElementById("result").innerText = "Enter time in format: HH:MM AM/PM";
+          return;
+        }
+        const { hours, minutes } = parsed;
+        dateObj = new Date(date);
+        dateObj.setHours(hours, minutes, 0, 0);
+      } else {
+        const timeInput = document.getElementById("utcTime").value;
+        if (!timeInput) {
+          document.getElementById("result").innerText = "Enter time in 24hr format (HH:MM)";
+          return;
+        }
+        const datetimeStr = `${date}T${timeInput}Z`;
+        dateObj = new Date(datetimeStr);
+      }
 
       const timestamp = Math.floor(dateObj.getTime() / 1000);
       const tag = `<t:${timestamp}:${format}>`;
