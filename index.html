@@ -60,7 +60,7 @@
     Select Time Mode:
     <select id="mode" onchange="updateTimeInput()">
       <option value="local">Local Time (12hr)</option>
-      <option value="utc">UTC Time (24hr)</option>
+      <option value="utc" selected>UTC Time (24hr)</option>
     </select>
   </label>
 
@@ -69,17 +69,18 @@
     <input type="date" id="date" />
   </label>
 
-  <div id="localTimeContainer">
+  <!-- Initially hide local and show UTC by default -->
+  <div id="localTimeContainer" style="display: none;">
     <label>
       Time (12hr):
       <input type="time" id="localTime" />
     </label>
   </div>
 
-  <div id="utcTimeContainer" style="display: none;">
+  <div id="utcTimeContainer">
     <label>
       Time (24hr, e.g. 19:45 or 19:45:30):
-      <input type="text" id="utcTime" placeholder="HH:MM or HH:MM:SS" />
+      <input type="text" id="utcTime" placeholder="HH:MM:SS" />
     </label>
   </div>
 
@@ -102,97 +103,88 @@
 
   <script>
     function updateTimeInput() {
-      const mode = document.getElementById("mode").value;
-      document.getElementById("localTimeContainer").style.display = mode === "local" ? "block" : "none";
-      document.getElementById("utcTimeContainer").style.display  = mode === "utc"   ? "block" : "none";
+      const mode = document.getElementById('mode').value;
+      document.getElementById('localTimeContainer').style.display = mode === 'local' ? 'block' : 'none';
+      document.getElementById('utcTimeContainer').style.display   = mode === 'utc'   ? 'block' : 'none';
+      updateFormatOptions();
     }
 
     function parseUTCTime(input) {
       const timeRegex = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/;
       const match = input.match(timeRegex);
-      if (!match) return null;
-      let [, hours, minutes, seconds] = match;
-      return {
-        hours:   parseInt(hours,   10),
-        minutes: parseInt(minutes, 10),
-        seconds: parseInt(seconds||"0", 10)
-      };
-    }
-
-    function generate() {
-      const mode   = document.getElementById("mode").value;
-      const date   = document.getElementById("date").value;
-      const format = document.getElementById("format").value;
-
-      if (!date) {
-        return showResult("❌ Please select a date.");
-      }
-
-      let dateObj;
-      if (mode === "local") {
-        const timeVal = document.getElementById("localTime").value;
-        if (!timeVal) {
-          return showResult("❌ Enter valid local time.");
-        }
-        // --- NEW: Parse date parts and construct local Date directly ---
-        const [year, month, day] = date.split("-").map(Number);
-        const [hours, minutes] = timeVal.split(":").map(Number);
-        dateObj = new Date(year, month - 1, day, hours, minutes, 0);
-      }
-      else {
-        const input = document.getElementById("utcTime").value.trim();
-        const p = parseUTCTime(input);
-        if (!p) {
-          return showResult("❌ Enter valid UTC time: HH:MM or HH:MM:SS");
-        }
-        dateObj = new Date(`${date}T00:00:00Z`);
-        dateObj.setUTCHours(p.hours, p.minutes, p.seconds, 0);
-      }
-
-      const timestamp = Math.floor(dateObj.getTime() / 1000);
-      const safeTag   = `&lt;t:${timestamp}:${format}&gt;`;
-      const preview   = getPreview(format, dateObj);
-
-      showResult(`
-        ✅ <strong>Discord Tag:</strong><br>
-        <pre class="copyable">${safeTag}</pre>
-        📆 <strong>Preview:</strong> ${preview}<br><br>
-        🔢 <strong>Unix Timestamp:</strong> ${timestamp}
-      `);
+      return match && { hours: +match[1], minutes: +match[2], seconds: +match[3] || 0 };
     }
 
     function getPreview(format, dateObj) {
-      const optsDate = { year:"numeric", month:"long", day:"numeric" };
-      switch (format) {
-        case "F": return dateObj.toLocaleString();
-        case "f": return dateObj.toLocaleString([], { dateStyle:"medium", timeStyle:"short" });
-        case "d": return dateObj.toLocaleDateString();
-        case "D": return dateObj.toLocaleDateString(undefined, optsDate);
-        case "t": return dateObj.toLocaleTimeString([], { hour:"2-digit", minute:"2-digit" });
-        case "T": return dateObj.toLocaleTimeString();
-        case "R": return getRelative(dateObj);
-        default:  return "";
+      if (format === 'R') {
+        const diff = Math.floor((dateObj - Date.now())/1000);
+        const rtf  = new Intl.RelativeTimeFormat(navigator.language, { numeric: 'auto' });
+        for (const [unit, sec] of [['year',31536000],['month',2592000],['day',86400],['hour',3600],['minute',60],['second',1]]) {
+          if (Math.abs(diff) >= sec || unit === 'second')
+            return rtf.format(Math.round(diff/sec), unit);
+        }
+      }
+      const opts = {};
+      if (format === 't') { opts.hour='2-digit'; opts.minute='2-digit'; }
+      if (format === 'T') { opts.hour='2-digit'; opts.minute='2-digit'; opts.second='2-digit'; }
+      if (format === 'd') return dateObj.toLocaleDateString();
+      if (format === 'D') return dateObj.toLocaleDateString(undefined, {year:'numeric',month:'long',day:'numeric'});
+      if (format === 'f') { opts.dateStyle='long'; opts.timeStyle='short'; }
+      if (format === 'F') { opts.dateStyle='full'; opts.timeStyle='short'; }
+      return new Intl.DateTimeFormat(navigator.language, opts).format(dateObj);
+    }
+
+    function updateFormatOptions() {
+      const dateVal = document.getElementById('date').value;
+      if (!dateVal) return;
+      let dateObj;
+      if (document.getElementById('mode').value === 'local') {
+        const t = document.getElementById('localTime').value;
+        if (!t) return;
+        const [y,m,d] = dateVal.split('-').map(Number);
+        const [h,mm]  = t.split(':').map(Number);
+        dateObj = new Date(y,m-1,d,h,mm);
+      } else {
+        const p = parseUTCTime(document.getElementById('utcTime').value.trim());
+        if (!p) return;
+        dateObj = new Date(dateVal+'T00:00:00Z');
+        dateObj.setUTCHours(p.hours,p.minutes,p.seconds);
+      }
+      const labels = {F:'Full Date & Time',f:'Short Date & Time',R:'Relative',d:'Short Date',D:'Long Date',t:'Short Time',T:'Long Time'};
+      for (const opt of document.getElementById('format').options) {
+        opt.text = `${labels[opt.value]} — ${getPreview(opt.value, dateObj)}`;
       }
     }
 
-    function getRelative(d) {
-      const diff = Math.floor((d - Date.now()) / 1000);
-      const abs  = Math.abs(diff), sfx = diff>0?"from now":"ago";
-      if (abs<60)           return `${abs} seconds ${sfx}`;
-      const m = Math.floor(abs/60);
-      if (m<60)             return `${m} minutes ${sfx}`;
-      const h = Math.floor(m/60);
-      if (h<24)             return `${h} hours ${sfx}`;
-      const days = Math.floor(h/24);
-      return `${days} days ${sfx}`;
+    function generate() {
+      const dateVal = document.getElementById('date').value;
+      if (!dateVal) return showResult('❌ Please select a date.');
+      let dateObj;
+      if (document.getElementById('mode').value === 'local') {
+        const t = document.getElementById('localTime').value;
+        if (!t) return showResult('❌ Enter valid local time.');
+        const [y,m,d] = dateVal.split('-').map(Number);
+        const [h,min] = t.split(':').map(Number);
+        dateObj = new Date(y,m-1,d,h,min);
+      } else {
+        const p = parseUTCTime(document.getElementById('utcTime').value.trim());
+        if (!p) return showResult('❌ Enter valid UTC time.');
+        dateObj = new Date(dateVal+'T00:00:00Z');
+        dateObj.setUTCHours(p.hours,p.minutes,p.seconds);
+      }
+      const ts      = Math.floor(dateObj.getTime()/1000);
+      const tag     = `&lt;t:${ts}:${document.getElementById('format').value}&gt;`;
+      const preview = getPreview(document.getElementById('format').value, dateObj);
+      showResult(`✅ <strong>Discord Tag:</strong><br><pre class='copyable'>${tag}</pre>📆 <strong>Preview:</strong> ${preview}<br><br>🔢 <strong>Unix Timestamp:</strong> ${ts}`);
     }
 
     function showResult(html) {
-      const r = document.getElementById("result");
-      r.innerHTML = html;
-      r.style.display = "block";
+      const r = document.getElementById('result');
+      r.innerHTML   = html;
+      r.style.display = 'block';
     }
 
+    // On load, just toggle inputs. No auto-fill.
     window.onload = updateTimeInput;
   </script>
 </body>
