@@ -21,9 +21,11 @@
       background: #2c2c3a;
       border-radius: 8px;
       font-family: monospace;
+      line-height: 1.6;
     }
-    .output span {
+    .copyable {
       cursor: pointer;
+      color: #80c4ff;
     }
     input, select {
       background: #2c2c3a;
@@ -57,23 +59,23 @@
     </select>
   </label>
 
-  <label>
-    Date:
+  <label>Date:
     <input type="date" id="date" />
   </label>
 
   <div id="localTimeContainer">
-    <label>Time (12hr):</label>
-    <input type="time" id="localTime" />
+    <label>Time (12hr):
+      <input type="time" id="localTime" />
+    </label>
   </div>
 
   <div id="utcTimeContainer" style="display: none;">
-    <label>Time (24hr, e.g. 19:45 or 19:45:30):</label>
-    <input type="text" id="utcTime" placeholder="HH:MM or HH:MM:SS" />
+    <label>Time (24hr, e.g. 19:45 or 19:45:30):
+      <input type="text" id="utcTime" placeholder="HH:MM or HH:MM:SS" />
+    </label>
   </div>
 
-  <label>
-    Format:
+  <label>Format:
     <select id="format">
       <option value="F">Full Date & Time (F)</option>
       <option value="f">Short Date & Time (f)</option>
@@ -100,7 +102,6 @@
       const timeRegex = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/;
       const match = input.match(timeRegex);
       if (!match) return null;
-
       let [, hours, minutes, seconds] = match;
       return {
         hours: parseInt(hours, 10),
@@ -116,16 +117,14 @@
       let dateObj;
 
       if (!date) {
-        showResult("Please select a date.");
+        showResult("❌ Please select a date.");
         return;
       }
-
-      let parsedTime;
 
       if (mode === "local") {
         const timeVal = document.getElementById("localTime").value;
         if (!timeVal) {
-          showResult("Enter valid time in local format.");
+          showResult("❌ Enter valid time in local format.");
           return;
         }
         const [hours, minutes] = timeVal.split(":").map(Number);
@@ -133,9 +132,9 @@
         dateObj.setHours(hours, minutes, 0, 0);
       } else {
         const timeInput = document.getElementById("utcTime").value.trim();
-        parsedTime = parseUTCTime(timeInput);
+        const parsedTime = parseUTCTime(timeInput);
         if (!parsedTime) {
-          showResult("Enter valid 24hr time: HH:MM or HH:MM:SS");
+          showResult("❌ Enter valid 24hr time: HH:MM or HH:MM:SS");
           return;
         }
         dateObj = new Date(`${date}T00:00:00Z`);
@@ -143,13 +142,12 @@
       }
 
       const timestamp = Math.floor(dateObj.getTime() / 1000);
-      const tag = `<t:${timestamp}:${format}>`;
+      const discordTag = `<t:${timestamp}:${format}>`;
 
       showResult(`
-        <strong>Output:</strong><br/>
-        <span onclick="copyTag('${tag}')" title="Click to copy" style="color:#80c4ff;">${tag}</span>
-        <br/><br/>
-        <small>Unix timestamp: ${timestamp}</small>
+        ✅ <strong>Discord Timestamp:</strong><br>
+        <span class="copyable" onclick="copyTag('${discordTag}')">${discordTag}</span><br><br>
+        🧮 <strong>Unix Timestamp:</strong> ${timestamp}
       `);
     }
 
