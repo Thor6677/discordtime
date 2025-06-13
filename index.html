@@ -44,11 +44,6 @@
     button:hover {
       background: #4752c4;
     }
-    .flex {
-      display: flex;
-      gap: 0.5rem;
-      align-items: center;
-    }
   </style>
 </head>
 <body>
@@ -57,7 +52,7 @@
   <label>
     Select Time Mode:
     <select id="mode" onchange="updateTimeInput()">
-      <option value="local">Local Time (AM/PM)</option>
+      <option value="local">Local Time (12hr)</option>
       <option value="utc">UTC Time (24hr)</option>
     </select>
   </label>
@@ -68,12 +63,12 @@
   </label>
 
   <div id="localTimeContainer">
-    <label>Time (12hr, e.g. 07:30 PM):</label>
-    <input type="text" id="localTime" placeholder="HH:MM AM/PM" />
+    <label>Time (12hr):</label>
+    <input type="time" id="localTime" />
   </div>
 
   <div id="utcTimeContainer" style="display: none;">
-    <label>Time (24hr, e.g. 19:45):</label>
+    <label>Time (24hr, e.g. 19:45 or 19:45:30):</label>
     <input type="text" id="utcTime" placeholder="HH:MM or HH:MM:SS" />
   </div>
 
@@ -101,20 +96,6 @@
       document.getElementById("utcTimeContainer").style.display = mode === "utc" ? "block" : "none";
     }
 
-    function parseLocalTime(input) {
-      const timeRegex = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i;
-      const match = input.match(timeRegex);
-      if (!match) return null;
-
-      let [_, hours, minutes, period] = match;
-      hours = parseInt(hours, 10);
-      minutes = parseInt(minutes, 10);
-      if (period.toUpperCase() === "PM" && hours !== 12) hours += 12;
-      if (period.toUpperCase() === "AM" && hours === 12) hours = 0;
-
-      return { hours, minutes, seconds: 0 };
-    }
-
     function parseUTCTime(input) {
       const timeRegex = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/;
       const match = input.match(timeRegex);
@@ -139,34 +120,34 @@
         return;
       }
 
-      let timeInput, parsedTime;
+      let parsedTime;
 
       if (mode === "local") {
-        timeInput = document.getElementById("localTime").value.trim();
-        parsedTime = parseLocalTime(timeInput);
-        if (!parsedTime) {
-          showResult("Enter valid 12hr time: HH:MM AM/PM");
+        const timeVal = document.getElementById("localTime").value;
+        if (!timeVal) {
+          showResult("Enter valid time in local format.");
           return;
         }
+        const [hours, minutes] = timeVal.split(":").map(Number);
         dateObj = new Date(date);
+        dateObj.setHours(hours, minutes, 0, 0);
       } else {
-        timeInput = document.getElementById("utcTime").value.trim();
+        const timeInput = document.getElementById("utcTime").value.trim();
         parsedTime = parseUTCTime(timeInput);
         if (!parsedTime) {
           showResult("Enter valid 24hr time: HH:MM or HH:MM:SS");
           return;
         }
         dateObj = new Date(`${date}T00:00:00Z`);
+        dateObj.setUTCHours(parsedTime.hours, parsedTime.minutes, parsedTime.seconds, 0);
       }
-
-      dateObj.setUTCHours(parsedTime.hours, parsedTime.minutes, parsedTime.seconds, 0);
 
       const timestamp = Math.floor(dateObj.getTime() / 1000);
       const tag = `<t:${timestamp}:${format}>`;
 
       showResult(`
         <strong>Output:</strong><br/>
-        <span onclick="copyTag('${tag}')" style="color:#aaf;cursor:pointer;" title="Click to copy">${tag}</span>
+        <span onclick="copyTag('${tag}')" title="Click to copy" style="color:#80c4ff;">${tag}</span>
         <br/><br/>
         <small>Unix timestamp: ${timestamp}</small>
       `);
