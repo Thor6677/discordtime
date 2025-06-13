@@ -29,7 +29,6 @@
       border-radius: 4px;
       color: #80c4ff;
       font-size: 1rem;
-      cursor: text;
       user-select: all;
       white-space: pre-wrap;
     }
@@ -124,36 +123,33 @@
       const mode   = document.getElementById("mode").value;
       const date   = document.getElementById("date").value;
       const format = document.getElementById("format").value;
-      let   dateObj;
 
       if (!date) {
-        showResult("❌ Please select a date.");
-        return;
+        return showResult("❌ Please select a date.");
       }
 
+      let dateObj;
       if (mode === "local") {
         const timeVal = document.getElementById("localTime").value;
         if (!timeVal) {
-          showResult("❌ Enter valid local time.");
-          return;
+          return showResult("❌ Enter valid local time.");
         }
+        // --- NEW: Parse date parts and construct local Date directly ---
+        const [year, month, day] = date.split("-").map(Number);
         const [hours, minutes] = timeVal.split(":").map(Number);
-        dateObj = new Date(date);
-        dateObj.setHours(hours, minutes, 0, 0);
-
-      } else {
+        dateObj = new Date(year, month - 1, day, hours, minutes, 0);
+      }
+      else {
         const input = document.getElementById("utcTime").value.trim();
         const p = parseUTCTime(input);
         if (!p) {
-          showResult("❌ Enter valid UTC time: HH:MM or HH:MM:SS");
-          return;
+          return showResult("❌ Enter valid UTC time: HH:MM or HH:MM:SS");
         }
         dateObj = new Date(`${date}T00:00:00Z`);
         dateObj.setUTCHours(p.hours, p.minutes, p.seconds, 0);
       }
 
       const timestamp = Math.floor(dateObj.getTime() / 1000);
-      const rawTag    = `<t:${timestamp}:${format}>`;
       const safeTag   = `&lt;t:${timestamp}:${format}&gt;`;
       const preview   = getPreview(format, dateObj);
 
@@ -180,25 +176,21 @@
     }
 
     function getRelative(d) {
-      const now = Date.now(), diff = Math.floor((d - now)/1000);
-      const abs = Math.abs(diff), sfx = diff>0?"from now":"ago";
-      if (abs<60) return `${abs} seconds ${sfx}`;
+      const diff = Math.floor((d - Date.now()) / 1000);
+      const abs  = Math.abs(diff), sfx = diff>0?"from now":"ago";
+      if (abs<60)           return `${abs} seconds ${sfx}`;
       const m = Math.floor(abs/60);
-      if (m<60) return `${m} minutes ${sfx}`;
+      if (m<60)             return `${m} minutes ${sfx}`;
       const h = Math.floor(m/60);
-      if (h<24) return `${h} hours ${sfx}`;
-      const dY = Math.floor(h/24);
-      return `${dY} days ${sfx}`;
+      if (h<24)             return `${h} hours ${sfx}`;
+      const days = Math.floor(h/24);
+      return `${days} days ${sfx}`;
     }
 
     function showResult(html) {
       const r = document.getElementById("result");
       r.innerHTML = html;
       r.style.display = "block";
-    }
-
-    function copyTag(text) {
-      navigator.clipboard.writeText(text);
     }
 
     window.onload = updateTimeInput;
