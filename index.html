@@ -23,9 +23,15 @@
       font-family: monospace;
       line-height: 1.6;
     }
-    .copyable {
-      cursor: pointer;
+    pre.copyable {
+      background: #1a1a2a;
+      padding: 0.5rem;
+      border-radius: 4px;
       color: #80c4ff;
+      font-size: 1rem;
+      cursor: pointer;
+      user-select: all;
+      white-space: pre-wrap;
     }
     input, select {
       background: #2c2c3a;
@@ -45,10 +51,6 @@
     }
     button:hover {
       background: #4752c4;
-    }
-    .preview {
-      margin-top: 0.5rem;
-      color: #aaa;
     }
   </style>
 </head>
@@ -146,12 +148,11 @@
 
       const timestamp = Math.floor(dateObj.getTime() / 1000);
       const discordTag = `<t:${timestamp}:${format}>`;
-
       const renderedPreview = getPreview(format, dateObj);
 
       showResult(`
         ✅ <strong>Discord Tag:</strong><br>
-        <code class="copyable" onclick="copyTag('${discordTag}')">${discordTag}</code><br><br>
+        <pre class="copyable" onclick="copyTag('${discordTag}')">${discordTag}</pre>
         📆 <strong>Preview:</strong> ${renderedPreview}<br><br>
         🔢 <strong>Unix Timestamp:</strong> ${timestamp}
       `);
