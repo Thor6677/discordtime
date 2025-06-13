@@ -19,6 +19,7 @@
       display: flex;
       align-items: center;
       gap: 0.5rem;
+      flex-wrap: wrap;
     }
     .output {
       margin-top: 1.5rem;
@@ -69,12 +70,13 @@
     Select Time Mode:
     <select id="mode" onchange="updateTimeInput()">
       <option value="local">Local Time (12hr)</option>
-      <option value="utc" selected>UTC Time (24hr)</option>
+      <option value="utc">UTC Time (24hr)</option>
+      <option value="offset" selected>From Now (Days/Hours/Minutes)</option>
     </select>
   </label>
 
-  <label>
-    Date:
+  <!-- Local date/time -->
+  <label id="dateLabel">Date:
     <input type="date" id="date" />
   </label>
 
@@ -91,10 +93,21 @@
     </label>
   </div>
 
-  <div id="utcTimeContainer">
+  <!-- UTC time -->
+  <div id="utcTimeContainer" style="display:none;">
     <label>
       Time (24hr, e.g. 19:45 or 19:45:30):
       <input type="text" id="utcTime" placeholder="HH:MM:SS" />
+    </label>
+  </div>
+
+  <!-- Offset from now -->
+  <div id="offsetContainer" style="display:block;">
+    <label class="time-inline">
+      <span>Offset:</span>
+      <input type="number" id="offsetDays" min="0" placeholder="Days" /> days
+      <input type="number" id="offsetHours" min="0" max="23" placeholder="Hours" /> hrs
+      <input type="number" id="offsetMinutes" min="0" max="59" placeholder="Minutes" /> min
     </label>
   </div>
 
@@ -116,123 +129,112 @@
   <div class="output" id="result" style="display:none;"></div>
 
   <script>
-    // Element references
     const modeEl      = document.getElementById('mode');
     const dateEl      = document.getElementById('date');
+    const dateLabel   = document.getElementById('dateLabel');
     const localHourEl = document.getElementById('localHour');
     const localMinEl  = document.getElementById('localMinute');
     const ampmEl      = document.getElementById('ampm');
     const utcEl       = document.getElementById('utcTime');
+    const offsetDays  = document.getElementById('offsetDays');
+    const offsetHours = document.getElementById('offsetHours');
+    const offsetMins  = document.getElementById('offsetMinutes');
     const formatEl    = document.getElementById('format');
     const resultEl    = document.getElementById('result');
     const localCont   = document.getElementById('localTimeContainer');
     const utcCont     = document.getElementById('utcTimeContainer');
+    const offsetCont  = document.getElementById('offsetContainer');
     const generateBtn = document.getElementById('generate');
 
-    // Toggle between 12hr and UTC modes
     function updateTimeInput() {
-      if (modeEl.value === 'local') {
-        localCont.style.display = 'block';
-        utcCont.style.display   = 'none';
-      } else {
-        localCont.style.display = 'none';
-        utcCont.style.display   = 'block';
-      }
+      const mode = modeEl.value;
+      // toggle containers
+      localCont.style.display  = mode === 'local'  ? 'block' : 'none';
+      utcCont.style.display    = mode === 'utc'    ? 'block' : 'none';
+      offsetCont.style.display = mode === 'offset' ? 'block' : 'none';
+      // date only for local/utc
+      dateLabel.style.display  = mode === 'offset' ? 'none' : 'block';
       updateFormatOptions();
     }
 
-    // Parse HH:MM[:SS] string
     function parseUTCTime(input) {
       const m = input.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
-      return m ? { hours: +m[1], minutes: +m[2], seconds: +(m[3] || 0) } : null;
+      return m && { hours:+m[1], minutes:+m[2], seconds:+(m[3]||0) };
     }
 
-    // Build Date from 12hr inputs
     function getLocalDateObj() {
       const dateVal = dateEl.value;
       const h = Number(localHourEl.value);
       const m = Number(localMinEl.value);
       if (!dateVal || isNaN(h) || isNaN(m)) return null;
       let hr = h % 12;
-      if (ampmEl.value === 'PM') hr += 12;
-      const [y, mo, d] = dateVal.split('-').map(Number);
-      return new Date(y, mo -1, d, hr, m, 0);
+      if (ampmEl.value==='PM') hr += 12;
+      const [y,mo,d] = dateVal.split('-').map(Number);
+      return new Date(y,mo-1,d,hr,m,0);
     }
 
-    // Format preview via Intl APIs
+    function getOffsetDateObj() {
+      const now = new Date();
+      const d = Number(offsetDays.value)||0;
+      const h = Number(offsetHours.value)||0;
+      const m = Number(offsetMins.value)||0;
+      return new Date(now.getTime() + d*86400000 + h*3600000 + m*60000);
+    }
+
     function getPreview(fmt, dateObj) {
       if (!dateObj) return '';
-      if (fmt === 'R') {
+      if (fmt==='R') {
         const diff = Math.floor((dateObj - Date.now())/1000);
-        const rtf  = new Intl.RelativeTimeFormat(navigator.language, { numeric: 'auto' });
-        const units = [['year',31536000],['month',2592000],['day',86400],['hour',3600],['minute',60],['second',1]];
-        for (const [unit, sec] of units) {
-          if (Math.abs(diff) >= sec || unit === 'second') {
-            return rtf.format(Math.round(diff/sec), unit);
-          }
+        const rtf  = new Intl.RelativeTimeFormat(navigator.language,{numeric:'auto'});
+        for (const [u,s] of [['year',31536000],['month',2592000],['day',86400],['hour',3600],['minute',60],['second',1]]) {
+          if (Math.abs(diff)>=s||u==='second') return rtf.format(Math.round(diff/s),u);
         }
       }
-      const opts = {};
-      switch (fmt) {
-        case 't': opts.hour='2-digit'; opts.minute='2-digit'; break;
-        case 'T': opts.hour='2-digit'; opts.minute='2-digit'; opts.second='2-digit'; break;
-        case 'd': return dateObj.toLocaleDateString();
-        case 'D': return dateObj.toLocaleDateString(undefined, { year:'numeric', month:'long', day:'numeric' });
-        case 'f': opts.dateStyle='long'; opts.timeStyle='short'; break;
-        case 'F': opts.dateStyle='full'; opts.timeStyle='short'; break;
-      }
-      return new Intl.DateTimeFormat(navigator.language, opts).format(dateObj);
+      const opts={};
+      if (fmt==='t') opts.hour='2-digit',opts.minute='2-digit';
+      if (fmt==='T') opts.hour='2-digit',opts.minute='2-digit',opts.second='2-digit';
+      if (fmt==='d') return dateObj.toLocaleDateString();
+      if (fmt==='D') return dateObj.toLocaleDateString(undefined,{year:'numeric',month:'long',day:'numeric'});
+      if (fmt==='f') opts.dateStyle='long',opts.timeStyle='short';
+      if (fmt==='F') opts.dateStyle='full',opts.timeStyle='short';
+      return new Intl.DateTimeFormat(navigator.language,opts).format(dateObj);
     }
 
-    // Update each dropdown option with preview
     function updateFormatOptions() {
-      const dateVal = dateEl.value;
-      if (!dateVal) return;
       let dateObj;
-      if (modeEl.value === 'local') {
-        dateObj = getLocalDateObj();
-      } else {
+      if (modeEl.value==='local') dateObj = getLocalDateObj();
+      else if (modeEl.value==='utc') {
         const p = parseUTCTime(utcEl.value.trim());
-        if (!p) return;
-        dateObj = new Date(`${dateVal}T00:00:00Z`);
-        dateObj.setUTCHours(p.hours, p.minutes, p.seconds, 0);
-      }
-      const labels = {F:'Full Date & Time',f:'Short Date & Time',R:'Relative',d:'Short Date',D:'Long Date',t:'Short Time',T:'Long Time'};
-      for (const opt of formatEl.options) {
-        opt.text = `${labels[opt.value]} — ${getPreview(opt.value, dateObj)}`;
-      }
+        if (!p) return; dateObj = new Date(`${dateEl.value}T00:00:00Z`);
+        dateObj.setUTCHours(p.hours,p.minutes,p.seconds,0);
+      } else dateObj = getOffsetDateObj();
+      const labels={F:'Full Date & Time',f:'Short Date & Time',R:'Relative',d:'Short Date',D:'Long Date',t:'Short Time',T:'Long Time'};
+      for (const opt of formatEl.options) opt.text=`${labels[opt.value]} — ${getPreview(opt.value,dateObj)}`;
     }
 
-    // Show result block
-    function showResult(html) {
-      resultEl.innerHTML = html;
-      resultEl.style.display = 'block';
+    function showResult(html){
+      resultEl.innerHTML=html; resultEl.style.display='block';
     }
 
-    // Generate timestamp on button click
-    generateBtn.addEventListener('click', () => {
-      const dateVal = dateEl.value;
-      if (!dateVal) return showResult('❌ Please select a date.');
+    generateBtn.addEventListener('click',()=>{
       let dateObj;
-      if (modeEl.value === 'local') {
-        dateObj = getLocalDateObj();
-        if (!dateObj) return showResult('❌ Enter valid local time.');
-      } else {
-        const p = parseUTCTime(utcEl.value.trim());
+      if (modeEl.value==='local') dateObj=getLocalDateObj(),!dateObj&&showResult('❌ Enter valid local time.');
+      else if (modeEl.value==='utc') {
+        const p=parseUTCTime(utcEl.value.trim());
         if (!p) return showResult('❌ Enter valid UTC time.');
-        dateObj = new Date(`${dateVal}T00:00:00Z`);
-        dateObj.setUTCHours(p.hours, p.minutes, p.seconds, 0);
-      }
-      const ts   = Math.floor(dateObj.getTime()/1000);
-      const fmt  = formatEl.value;
-      const tag  = `&lt;t:${ts}:${fmt}&gt;`;
-      const prev = getPreview(fmt, dateObj);
+        dateObj=new Date(`${dateEl.value}T00:00:00Z`);
+        dateObj.setUTCHours(p.hours,p.minutes,p.seconds,0);
+      } else dateObj=getOffsetDateObj();
+      const ts=Math.floor(dateObj.getTime()/1000);
+      const fmt=formatEl.value;
+      const tag=`&lt;t:${ts}:${fmt}&gt;`;
+      const prev=getPreview(fmt,dateObj);
       showResult(`✅ <strong>Discord Tag:</strong><br><pre class="copyable">${tag}</pre>📆 <strong>Preview:</strong> ${prev}<br><br>🔢 <strong>Unix Timestamp:</strong> ${ts}`);
     });
 
-    // Re-run toggle on changes
-    [modeEl,dateEl,localHourEl,localMinEl,ampmEl,utcEl].forEach(el => el.addEventListener('change', updateTimeInput));
-    window.onload = updateTimeInput;
+    [modeEl,dateEl,localHourEl,localMinEl,ampmEl,utcEl,offsetDays,offsetHours,offsetMins]
+      .forEach(el=>el.addEventListener('change',updateTimeInput));
+    window.onload=updateTimeInput;
   </script>
 </body>
 </html>
