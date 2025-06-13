@@ -29,7 +29,7 @@
       border-radius: 4px;
       color: #80c4ff;
       font-size: 1rem;
-      cursor: pointer;
+      cursor: text;
       user-select: all;
       white-space: pre-wrap;
     }
@@ -57,30 +57,35 @@
 <body>
   <h1>Discord Timestamp Generator</h1>
 
-  <label>Select Time Mode:
+  <label>
+    Select Time Mode:
     <select id="mode" onchange="updateTimeInput()">
       <option value="local">Local Time (12hr)</option>
       <option value="utc">UTC Time (24hr)</option>
     </select>
   </label>
 
-  <label>Date:
+  <label>
+    Date:
     <input type="date" id="date" />
   </label>
 
   <div id="localTimeContainer">
-    <label>Time (12hr):
+    <label>
+      Time (12hr):
       <input type="time" id="localTime" />
     </label>
   </div>
 
   <div id="utcTimeContainer" style="display: none;">
-    <label>Time (24hr, e.g. 19:45 or 19:45:30):
+    <label>
+      Time (24hr, e.g. 19:45 or 19:45:30):
       <input type="text" id="utcTime" placeholder="HH:MM or HH:MM:SS" />
     </label>
   </div>
 
-  <label>Format:
+  <label>
+    Format:
     <select id="format">
       <option value="F">Full Date & Time (F)</option>
       <option value="f">Short Date & Time (f)</option>
@@ -100,7 +105,7 @@
     function updateTimeInput() {
       const mode = document.getElementById("mode").value;
       document.getElementById("localTimeContainer").style.display = mode === "local" ? "block" : "none";
-      document.getElementById("utcTimeContainer").style.display = mode === "utc" ? "block" : "none";
+      document.getElementById("utcTimeContainer").style.display  = mode === "utc"   ? "block" : "none";
     }
 
     function parseUTCTime(input) {
@@ -109,17 +114,17 @@
       if (!match) return null;
       let [, hours, minutes, seconds] = match;
       return {
-        hours: parseInt(hours, 10),
+        hours:   parseInt(hours,   10),
         minutes: parseInt(minutes, 10),
-        seconds: parseInt(seconds || "0", 10)
+        seconds: parseInt(seconds||"0", 10)
       };
     }
 
     function generate() {
-      const mode = document.getElementById("mode").value;
-      const date = document.getElementById("date").value;
+      const mode   = document.getElementById("mode").value;
+      const date   = document.getElementById("date").value;
       const format = document.getElementById("format").value;
-      let dateObj;
+      let   dateObj;
 
       if (!date) {
         showResult("❌ Please select a date.");
@@ -129,75 +134,71 @@
       if (mode === "local") {
         const timeVal = document.getElementById("localTime").value;
         if (!timeVal) {
-          showResult("❌ Enter valid time in local format.");
+          showResult("❌ Enter valid local time.");
           return;
         }
         const [hours, minutes] = timeVal.split(":").map(Number);
         dateObj = new Date(date);
         dateObj.setHours(hours, minutes, 0, 0);
+
       } else {
-        const timeInput = document.getElementById("utcTime").value.trim();
-        const parsedTime = parseUTCTime(timeInput);
-        if (!parsedTime) {
-          showResult("❌ Enter valid 24hr time: HH:MM or HH:MM:SS");
+        const input = document.getElementById("utcTime").value.trim();
+        const p = parseUTCTime(input);
+        if (!p) {
+          showResult("❌ Enter valid UTC time: HH:MM or HH:MM:SS");
           return;
         }
         dateObj = new Date(`${date}T00:00:00Z`);
-        dateObj.setUTCHours(parsedTime.hours, parsedTime.minutes, parsedTime.seconds, 0);
+        dateObj.setUTCHours(p.hours, p.minutes, p.seconds, 0);
       }
 
       const timestamp = Math.floor(dateObj.getTime() / 1000);
-      const discordTag = `<t:${timestamp}:${format}>`;
-      const renderedPreview = getPreview(format, dateObj);
+      const rawTag    = `<t:${timestamp}:${format}>`;
+      const safeTag   = `&lt;t:${timestamp}:${format}&gt;`;
+      const preview   = getPreview(format, dateObj);
 
       showResult(`
         ✅ <strong>Discord Tag:</strong><br>
-        <pre class="copyable" onclick="copyTag('${discordTag}')">${discordTag}</pre>
-        📆 <strong>Preview:</strong> ${renderedPreview}<br><br>
+        <pre class="copyable">${safeTag}</pre>
+        📆 <strong>Preview:</strong> ${preview}<br><br>
         🔢 <strong>Unix Timestamp:</strong> ${timestamp}
       `);
     }
 
     function getPreview(format, dateObj) {
-      const optsDate = { year: "numeric", month: "long", day: "numeric" };
-      const optsTime = { hour: "numeric", minute: "2-digit", second: "2-digit" };
+      const optsDate = { year:"numeric", month:"long", day:"numeric" };
       switch (format) {
         case "F": return dateObj.toLocaleString();
-        case "f": return dateObj.toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
-        case "R": return getRelativeTime(dateObj);
+        case "f": return dateObj.toLocaleString([], { dateStyle:"medium", timeStyle:"short" });
         case "d": return dateObj.toLocaleDateString();
         case "D": return dateObj.toLocaleDateString(undefined, optsDate);
-        case "t": return dateObj.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+        case "t": return dateObj.toLocaleTimeString([], { hour:"2-digit", minute:"2-digit" });
         case "T": return dateObj.toLocaleTimeString();
-        default: return "";
+        case "R": return getRelative(dateObj);
+        default:  return "";
       }
     }
 
-    function getRelativeTime(dateObj) {
-      const now = new Date();
-      const diffSeconds = Math.floor((dateObj - now) / 1000);
-      const abs = Math.abs(diffSeconds);
-      const suffix = diffSeconds > 0 ? "from now" : "ago";
-
-      if (abs < 60) return `${abs} seconds ${suffix}`;
-      const minutes = Math.floor(abs / 60);
-      if (minutes < 60) return `${minutes} minutes ${suffix}`;
-      const hours = Math.floor(minutes / 60);
-      if (hours < 24) return `${hours} hours ${suffix}`;
-      const days = Math.floor(hours / 24);
-      return `${days} days ${suffix}`;
+    function getRelative(d) {
+      const now = Date.now(), diff = Math.floor((d - now)/1000);
+      const abs = Math.abs(diff), sfx = diff>0?"from now":"ago";
+      if (abs<60) return `${abs} seconds ${sfx}`;
+      const m = Math.floor(abs/60);
+      if (m<60) return `${m} minutes ${sfx}`;
+      const h = Math.floor(m/60);
+      if (h<24) return `${h} hours ${sfx}`;
+      const dY = Math.floor(h/24);
+      return `${dY} days ${sfx}`;
     }
 
     function showResult(html) {
-      const result = document.getElementById("result");
-      result.innerHTML = html;
-      result.style.display = "block";
+      const r = document.getElementById("result");
+      r.innerHTML = html;
+      r.style.display = "block";
     }
 
     function copyTag(text) {
-      navigator.clipboard.writeText(text).then(() => {
-        alert("Copied to clipboard:\n" + text);
-      });
+      navigator.clipboard.writeText(text);
     }
 
     window.onload = updateTimeInput;
