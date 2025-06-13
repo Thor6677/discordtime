@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Discord Timestamp Generator</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #1e1e2f;
+      color: #eee;
+      padding: 2rem;
+    }
+    label, select, input {
+      display: block;
+      margin: 0.5rem 0;
+    }
+    .output {
+      margin-top: 1rem;
+      padding: 1rem;
+      background: #2c2c3a;
+      border-radius: 8px;
+      font-family: monospace;
+    }
+    .output span {
+      cursor: pointer;
+    }
+    input, select {
+      background: #2c2c3a;
+      color: #eee;
+      border: none;
+      padding: 0.5rem;
+      border-radius: 4px;
+    }
+    button {
+      background: #5865f2;
+      color: white;
+      border: none;
+      padding: 0.6rem 1rem;
+      margin-top: 1rem;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #4752c4;
+    }
+  </style>
+</head>
+<body>
+  <h1>Discord Timestamp Generator</h1>
+
+  <label>
+    Select Time Mode:
+    <select id="mode">
+      <option value="local">Local Time</option>
+      <option value="utc">UTC Time</option>
+    </select>
+  </label>
+
+  <label>
+    Date:
+    <input type="date" id="date" />
+  </label>
+
+  <label>
+    Time:
+    <input type="time" id="time" step="1" />
+  </label>
+
+  <label>
+    Format:
+    <select id="format">
+      <option value="F">Full Date & Time (F)</option>
+      <option value="f">Short Date & Time (f)</option>
+      <option value="R">Relative (R)</option>
+      <option value="d">Short Date (d)</option>
+      <option value="D">Long Date (D)</option>
+      <option value="t">Short Time (t)</option>
+      <option value="T">Long Time (T)</option>
+    </select>
+  </label>
+
+  <button onclick="generate()">Generate Timestamp</button>
+
+  <div class="output" id="result"></div>
+
+  <script>
+    function generate() {
+      const mode = document.getElementById("mode").value;
+      const date = document.getElementById("date").value;
+      const time = document.getElementById("time").value;
+      const format = document.getElementById("format").value;
+
+      if (!date || !time) {
+        document.getElementById("result").innerText = "Please select a date and time.";
+        return;
+      }
+
+      const datetimeStr = `${date}T${time}`;
+      const dateObj = new Date(datetimeStr + (mode === "utc" ? "Z" : ""));
+
+      const timestamp = Math.floor(dateObj.getTime() / 1000);
+      const tag = `<t:${timestamp}:${format}>`;
+
+      document.getElementById("result").innerHTML = `
+        <strong>Output:</strong><br/>
+        <span onclick="copyTag('${tag}')" title="Click to copy">${tag}</span>
+        <br/><br/>
+        <small>Unix timestamp: ${timestamp}</small>
+      `;
+    }
+
+    function copyTag(text) {
+      navigator.clipboard.writeText(text).then(() => {
+        alert("Copied to clipboard: " + text);
+      });
+    }
+  </script>
+</body>
+</html>
