@@ -67,12 +67,14 @@
     <input type="date" id="date" />
   </label>
 
-  <div class="flex" id="localTimeContainer">
-    <label>Time (12hr): <input type="text" id="localTime" placeholder="02:30 PM" /></label>
+  <div id="localTimeContainer">
+    <label>Time (12hr, e.g. 07:30 PM):</label>
+    <input type="text" id="localTime" placeholder="HH:MM AM/PM" />
   </div>
 
-  <div class="flex" id="utcTimeContainer" style="display: none;">
-    <label>Time (24hr): <input type="time" id="utcTime" step="1" /></label>
+  <div id="utcTimeContainer" style="display: none;">
+    <label>Time (24hr, e.g. 19:45):</label>
+    <input type="text" id="utcTime" placeholder="HH:MM or HH:MM:SS" />
   </div>
 
   <label>
@@ -90,88 +92,99 @@
 
   <button onclick="generate()">Generate Timestamp</button>
 
-  <div class="output" id="result"></div>
+  <div class="output" id="result" style="display:none;"></div>
 
   <script>
-  function updateTimeInput() {
-    const mode = document.getElementById("mode").value;
-    const localTimeContainer = document.getElementById("localTimeContainer");
-    const utcTimeContainer = document.getElementById("utcTimeContainer");
-
-    if (mode === "local") {
-      localTimeContainer.style.display = "block";
-      utcTimeContainer.style.display = "none";
-    } else {
-      localTimeContainer.style.display = "none";
-      utcTimeContainer.style.display = "block";
-    }
-  }
-
-  function parseLocalTime(input) {
-    const timeRegex = /^(\d{1,2}):(\d{2})(?:\s*)(AM|PM)$/i;
-    const match = input.match(timeRegex);
-    if (!match) return null;
-
-    let [_, hours, minutes, period] = match;
-    hours = parseInt(hours, 10);
-    minutes = parseInt(minutes, 10);
-
-    if (period.toUpperCase() === "PM" && hours !== 12) hours += 12;
-    if (period.toUpperCase() === "AM" && hours === 12) hours = 0;
-
-    return { hours, minutes };
-  }
-
-  function generate() {
-    const mode = document.getElementById("mode").value;
-    const date = document.getElementById("date").value;
-    const format = document.getElementById("format").value;
-    let dateObj;
-
-    if (!date) {
-      document.getElementById("result").innerText = "Please select a date.";
-      return;
+    function updateTimeInput() {
+      const mode = document.getElementById("mode").value;
+      document.getElementById("localTimeContainer").style.display = mode === "local" ? "block" : "none";
+      document.getElementById("utcTimeContainer").style.display = mode === "utc" ? "block" : "none";
     }
 
-    if (mode === "local") {
-      const timeInput = document.getElementById("localTime").value.trim();
-      const parsed = parseLocalTime(timeInput);
-      if (!parsed) {
-        document.getElementById("result").innerText = "Enter time in format: HH:MM AM/PM";
+    function parseLocalTime(input) {
+      const timeRegex = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i;
+      const match = input.match(timeRegex);
+      if (!match) return null;
+
+      let [_, hours, minutes, period] = match;
+      hours = parseInt(hours, 10);
+      minutes = parseInt(minutes, 10);
+      if (period.toUpperCase() === "PM" && hours !== 12) hours += 12;
+      if (period.toUpperCase() === "AM" && hours === 12) hours = 0;
+
+      return { hours, minutes, seconds: 0 };
+    }
+
+    function parseUTCTime(input) {
+      const timeRegex = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/;
+      const match = input.match(timeRegex);
+      if (!match) return null;
+
+      let [, hours, minutes, seconds] = match;
+      return {
+        hours: parseInt(hours, 10),
+        minutes: parseInt(minutes, 10),
+        seconds: parseInt(seconds || "0", 10)
+      };
+    }
+
+    function generate() {
+      const mode = document.getElementById("mode").value;
+      const date = document.getElementById("date").value;
+      const format = document.getElementById("format").value;
+      let dateObj;
+
+      if (!date) {
+        showResult("Please select a date.");
         return;
       }
-      const { hours, minutes } = parsed;
-      dateObj = new Date(date);
-      dateObj.setHours(hours, minutes, 0, 0);
-    } else {
-      const timeInput = document.getElementById("utcTime").value;
-      if (!timeInput) {
-        document.getElementById("result").innerText = "Enter time in 24hr format (HH:MM)";
-        return;
+
+      let timeInput, parsedTime;
+
+      if (mode === "local") {
+        timeInput = document.getElementById("localTime").value.trim();
+        parsedTime = parseLocalTime(timeInput);
+        if (!parsedTime) {
+          showResult("Enter valid 12hr time: HH:MM AM/PM");
+          return;
+        }
+        dateObj = new Date(date);
+      } else {
+        timeInput = document.getElementById("utcTime").value.trim();
+        parsedTime = parseUTCTime(timeInput);
+        if (!parsedTime) {
+          showResult("Enter valid 24hr time: HH:MM or HH:MM:SS");
+          return;
+        }
+        dateObj = new Date(`${date}T00:00:00Z`);
       }
-      const datetimeStr = `${date}T${timeInput}Z`;
-      dateObj = new Date(datetimeStr);
+
+      dateObj.setUTCHours(parsedTime.hours, parsedTime.minutes, parsedTime.seconds, 0);
+
+      const timestamp = Math.floor(dateObj.getTime() / 1000);
+      const tag = `<t:${timestamp}:${format}>`;
+
+      showResult(`
+        <strong>Output:</strong><br/>
+        <span onclick="copyTag('${tag}')" style="color:#aaf;cursor:pointer;" title="Click to copy">${tag}</span>
+        <br/><br/>
+        <small>Unix timestamp: ${timestamp}</small>
+      `);
     }
 
-    const timestamp = Math.floor(dateObj.getTime() / 1000);
-    const tag = `<t:${timestamp}:${format}>`;
+    function showResult(html) {
+      const result = document.getElementById("result");
+      result.innerHTML = html;
+      result.style.display = "block";
+    }
 
-    document.getElementById("result").innerHTML = `
-      <strong>Output:</strong><br/>
-      <span onclick="copyTag('${tag}')" title="Click to copy">${tag}</span>
-      <br/><br/>
-      <small>Unix timestamp: ${timestamp}</small>
-    `;
-  }
+    function copyTag(text) {
+      navigator.clipboard.writeText(text).then(() => {
+        alert("Copied to clipboard:\n" + text);
+      });
+    }
 
-  function copyTag(text) {
-    navigator.clipboard.writeText(text).then(() => {
-      alert("Copied to clipboard: " + text);
-    });
-  }
-
-  // Ensure correct display on page load
-  window.onload = updateTimeInput;
-</script>
+    window.onload = updateTimeInput;
+  </script>
 </body>
 </html>
